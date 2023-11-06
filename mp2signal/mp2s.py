@@ -563,22 +563,8 @@ class Joint_Tree:
     def _get_normed_datum_coords(self):
             
         l_i =  self.dist_to_parent * self._get_root().body_muls
-        
-        if self.id==811:
-            l_i = a_distance_two_points_3d_z_low(self.joint_datum,self.parent.joint_datum)
-
         x_i = self.joint_datum[:,0]-self.parent.joint_datum[:,0]
         y_i = self.joint_datum[:,1]-self.parent.joint_datum[:,1]
-
-        #or_2d = a_distance_two_points_2d(self.joint_datum,self.parent.joint_datum)
-        or_3d = a_distance_two_points_3d_z_low(self.joint_datum,self.parent.joint_datum)
-
-        #sin_z = or_2d/or_3d
-        sin_x = x_i/or_3d
-        sin_y = y_i/or_3d
-
-        x_i = l_i * sin_x
-        y_i = l_i * sin_y
         z_i = np.power(abs(np.power(l_i,2)-np.power(x_i,2)-np.power(y_i,2)),0.5)
         
         if self.id==3 or self.id==6:
@@ -598,10 +584,7 @@ class Joint_Tree:
         y_i = y_i + self.parent.normed_coords[:,1]   
         z_i = z_i + self.parent.normed_coords[:,2]   
 
-        
-        #if self.id==811 or self.id==999 :
-        #    z_i = z_i * 0
-        
+    
         self.normed_coords = np.vstack((x_i,y_i,z_i,np.ones((x_i.shape[0])))).T
         #print('Tr',self.id)
         return
@@ -623,11 +606,6 @@ class Joint_Tree:
     def _get_rotated_coords(self, body_ancestor=0):
         if body_ancestor==0:
             target_coords = np.zeros(self.normed_coords.shape)
-            target_coords811 = np.zeros(self.normed_coords.shape)
-            #target_coords811[:,1] = self.dist_to_parent * self._get_root().body_muls
-
-            target_coords811[:,1] = a_distance_two_points_3d_z_low(self._get_root().joint_datum,self.joint_datum)
-            normed_coords811= self._get_root()._get_joint(811).normed_coords
 
             if self.id == 2:
                 target_coords[:,0] = -self.dist_to_parent * self._get_root().body_muls
@@ -640,8 +618,7 @@ class Joint_Tree:
             scale_coeffs = np.zeros((target_coords.shape[0]))
             rotation_mtrxs = np.zeros((target_coords.shape[0],4,4))
             for i in range(target_coords.shape[0]):
-                rotation_mtrxs[i] = get_rotation_mat(self.normed_coords[i], target_coords[i], normed_coords811[i], target_coords811[i] )
-                
+                rotation_mtrxs[i] = get_rotation_mat(self.normed_coords[i], target_coords[i])
                 rotated_c = rotate(self.normed_coords[i],rotation_mtrxs[i])
                 scale_coeffs[i] = abs(100/(rotated_c[0]+0.000001))
                 rotated_coords[i] = scale(rotated_c,scale_coeffs[i])
@@ -655,7 +632,7 @@ class Joint_Tree:
 
             rotated_coords = np.zeros((self.normed_coords.shape[0],3))
             rotation_mtrxs = self._get_root()._get_joint(body_ancestor).rotation_mtrxs
-            #not effective
+            #not efficient
             #rotated_c = nrotate(self.normed_coords,self._get_root()._get_joint(body_ancestor).rotation_mtrxs)
             #self.rotated_coords =nscale(rotated_c,self._get_root()._get_joint(body_ancestor).scale_coeffs)
 
@@ -723,8 +700,11 @@ class Joint_Tree:
             else:
                 if self.is_ancestor(5):
                     self._get_rotated_coords(5)
-                else:
+                elif self.is_ancestor(2):
                     self._get_rotated_coords(2)
+                else:
+                    self.rotated_coords = np.zeros((self.joint_datum.shape[0],3))
+                    self.rotated_coords[:,1] = self.dist_to_parent * self._get_root().body_muls
         
             x_i = self.rotated_coords[:,0]-self.parent.rotated_coords[:,0]
             y_i = self.rotated_coords[:,1]-self.parent.rotated_coords[:,1]
@@ -1429,15 +1409,12 @@ def a_distance_two_points_3d_z_low(a1,a2):
     dist = ( dx**2 + dy**2 + dz**2 + 0.00001)**0.5
     return dist
 
-def get_rotation_mat(inp, tar, inp811, tar811):
+def get_rotation_mat(inp, tar):
      
-    rot_y, yr = y_rot_m(inp,tar)
-    rot_z, zr = z_rot_m(rot_y,tar)
+    rot_y, yr = y_rot_m(inp,tar) 
     #the X rotation is usially not needed or have to be worked on, specifying the target rotation
-    
-    #in811= np.dot(inp811,np.dot(yr,zr))
-    #rot_x, xr = x_rot_m(in811,tar811)
-    #return np.dot(np.dot(yr,zr),xr)
+    #rot_x, xr = x_rot_m(rot_y,tar)
+    rot_z, zr = z_rot_m(rot_y,tar)
 
     return np.dot(yr,zr)
 
